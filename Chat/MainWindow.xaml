@@ -1,0 +1,25 @@
+﻿<Window x:Class="Chat.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:Chat"
+        mc:Ignorable="d"
+        Title="Let's chat!" Height="450" Width="800">
+    <Grid>
+        <StackPanel Height="80" VerticalAlignment="Top" Width="783" HorizontalAlignment="Left">
+            <Label x:Name="LblEnter" Content="Enter your name:" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="5,25,0,0" FontSize="14"/>
+            <TextBox x:Name="UserName" Height="30" Width="250" TextWrapping="Wrap" Text="" Margin="-280,-29,0,0" FontSize="14"/>
+            <ComboBox x:Name="ComboIPs" Height="30" Width="170" Margin="180,-29,0,0"/>
+            <Button x:Name="BtnConnect" Content="Connect" Width="80" FontSize="14" Margin="480,-29,0,0" Click="BtnConnect_Click"/>
+            <Button x:Name="BtnDisconnect" Content="Disconnect" Width="80" FontSize="14" Margin="680,-29,0,0" Click="BtnDisconnect_Click"/>
+        </StackPanel>
+        <StackPanel Height="250" VerticalAlignment="Top" Width="783" HorizontalAlignment="Left" Margin="0,80,0,0">
+            <TextBox x:Name="TxtChat" Height="250" TextWrapping="Wrap"/>
+        </StackPanel>
+        <StackPanel Height="80" VerticalAlignment="Top" Width="783" HorizontalAlignment="Left" Margin="0,330,0,0">
+            <TextBox x:Name="TxtMessage" Height="65" Width="600" TextWrapping="Wrap" Text="" Margin="-150,10,0,0" FontSize="14"/>
+            <Button x:Name="BtnSend" Content="Send" Width="100" Height="40" Margin="630,-65,0,0" FontSize="14" Click="BtnSend_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>
