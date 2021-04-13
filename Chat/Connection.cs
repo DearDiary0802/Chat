@@ -11,6 +11,7 @@ namespace Chat
 {
     delegate string GetDelegate();
     delegate void DisplayDelegate(string message);
+    delegate void ClearScreen();
 
     class Connection
     {
@@ -18,9 +19,11 @@ namespace Chat
         public const int RECEIVE_PORT = 50001;
         public const int TCP_PORT = 50002;
 
+        public static object _locker = new object();
+
         public const int MESSAGE = 1;
         public const int NAME_TRANSMISSION = 2;
-        public const int USER_DISCONNECT = 3; 
+        public const int USER_DISCONNECT = 3;
         public const int GET_HISTORY = 4;
         public const int SEND_HISTORY = 5;
 
@@ -28,22 +31,23 @@ namespace Chat
         private IPAddress userIP;
         private GetDelegate get;
         private DisplayDelegate display;
-        private List<User> Users;
+        private ClearScreen clearScreen;
+        private static List<User> Users = new List<User>();
         private StringBuilder history;
         private SynchronizationContext synchronizationContext;
 
         private bool ShouldUDPListen;
         private bool ShouldTCPListen;
-        
-        public Connection(string user, IPAddress userip, GetDelegate getDel, DisplayDelegate displayDel)
+
+        public Connection(string user, IPAddress userip, GetDelegate getDel, DisplayDelegate displayDel, ClearScreen ClearScreen)
         {
             userName = user;
             userIP = userip;
             get = getDel;
             display = displayDel;
-            Users = new List<User>();
             history = new StringBuilder();
             synchronizationContext = SynchronizationContext.Current;
+            clearScreen = ClearScreen;
         }
         public void Connect()
         {
@@ -51,10 +55,16 @@ namespace Chat
             {
                 IPAddress BroadcastIP = IPAddress.Parse(userIP.ToString().Substring(0, userIP.ToString().LastIndexOf('.') + 1) + "255");
 
-                Task listenUdpTask = new Task(ListenToUDP);
-                listenUdpTask.Start();
+                //Task listenUdpTask = new Task(ListenToUDP);
+                //listenUdpTask.Start();
 
-                Task listenTcpTask = new Task(ListenToTCP);
+                //Task listenTcpTask = new Task(ListenToTCP);
+                //listenTcpTask.Start();
+
+                Thread listenUdp = new Thread(() => ListenToUDP());
+                listenUdp.Start();
+
+                Thread listenTcpTask = new Thread(() => ListenToTCP());
                 listenTcpTask.Start();
 
                 SendBroadcastPackage(BroadcastIP);
@@ -100,19 +110,22 @@ namespace Chat
             while (ShouldUDPListen)
             {
                 byte[] message = udpReceiver.Receive(ref remoteEP);
-                string userName = (Encoding.UTF8.GetString(message));
+                string userName = Encoding.UTF8.GetString(message);
 
                 User newUser = new User(userName, remoteEP.Address, TCP_PORT);
+
 
                 if (Users.Find(x => x.userIP.ToString() == remoteEP.Address.ToString()) == null && userIP.ToString() != remoteEP.Address.ToString())
                 {
                     newUser.Connect();
 
-                    Message tcpMessage = new Message(NAME_TRANSMISSION, newUser.userName);
+                    Message tcpMessage = new Message(NAME_TRANSMISSION, this.userName);
                     newUser.SendMessage(tcpMessage);
 
                     Users.Add(newUser);
-                    Task.Factory.StartNew(() => ListenUser(newUser));
+                    //Task.Factory.StartNew(() => ListenUser(newUser));
+                    Thread thread = new Thread(() => ListenUser(newUser));
+                    thread.Start();
 
                     synchronizationContext.Post(
                         delegate
@@ -136,9 +149,16 @@ namespace Chat
             {
                 if (tcpListener.Pending())
                 {
-                    User newUser = new User(tcpListener.AcceptTcpClient(), TCP_PORT);
-                    if (newUser.userIP != userIP)
-                        Task.Factory.StartNew(() => ListenUser(newUser));
+                    TcpClient tcpClient = tcpListener.AcceptTcpClient();
+                    User newUser = new User(tcpClient, TCP_PORT);
+
+                    if (Users.Find(x => x.userIP.ToString() == newUser.userIP.ToString()) == null && userIP.ToString() != newUser.userIP.ToString())
+                    {
+                        Users.Add(newUser);
+                        Thread thread = new Thread(() => ListenUser(newUser));
+                        thread.Start();
+                        //Task.Factory.StartNew(() => ListenUser(newUser));
+                    }
                 }
             }
 
@@ -187,7 +207,6 @@ namespace Chat
                     {
                         case NAME_TRANSMISSION:
                             user.userName = tcpMessage.Text;
-                            Users.Add(user);
 
                             GetHistory(SEND_HISTORY, user);
 
@@ -205,13 +224,17 @@ namespace Chat
                             break;
 
                         case SEND_HISTORY:
+                            Thread.Sleep(200);
                             GetHistory(GET_HISTORY, user);
                             break;
 
                         case GET_HISTORY:
+
                             synchronizationContext.Post(delegate
                             {
+                                clearScreen();
                                 HistoryPreparing(display, tcpMessage.Text);
+                                //display(tcpMessage.Text);
                                 history.Remove(0, history.Length);
                                 history.Append(tcpMessage.Text);
                             }, null);
@@ -266,7 +289,7 @@ namespace Chat
         {
             int HistoryCount = 0, AllLength = Text.Length;
             string MyHistory = "", History = Text;
-            string Message;
+            string Message = "";
             while (History != "")
             {
                 Message = History.Substring(0, History.IndexOf('\n') + 1);

@@ -26,7 +26,7 @@ namespace Chat
         private void BtnConnect_Click(object sender, RoutedEventArgs e)
         {
             string userName = UserName.Text;
-            userConnection = new Connection(userName, userip, GetMessage, DisplayMessage);
+            userConnection = new Connection(userName, userip, GetMessage, DisplayMessage, ClearScreen);
             userConnection.Connect();
 
             UserName.IsReadOnly = true;
@@ -34,6 +34,10 @@ namespace Chat
             BtnConnect.IsEnabled = false;
             BtnDisconnect.IsEnabled = true;
             BtnSend.IsEnabled = true;
+        }
+        private void ClearScreen()
+        {
+            TxtChat.Text = "";
         }
         private string GetMessage()
         {
@@ -53,7 +57,7 @@ namespace Chat
         private void BtnDisconnect_Click(object sender, RoutedEventArgs e)
         {
             userConnection.Disconnect();
-            Close();
+            System.Environment.Exit(0);
         }
         public void GetLocalIPAddress()
         {
@@ -61,6 +65,12 @@ namespace Chat
                 if (IP.AddressFamily == AddressFamily.InterNetwork)
                     ComboIPs.Items.Add(IP);
             ComboIPs.SelectedIndex = ComboIPs.Items.Count - 1;
+        }
+
+        private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            userConnection.Disconnect();
+            System.Environment.Exit(0);
         }
     }
 }

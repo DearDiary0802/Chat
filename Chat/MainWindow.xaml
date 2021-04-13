@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Chat"
         mc:Ignorable="d"
-        Title="Let's chat!" Height="450" Width="800">
+        Title="Let's chat!" Height="450" Width="800" Closing="Window_Closing">
     <Grid>
         <StackPanel Height="80" VerticalAlignment="Top" Width="783" HorizontalAlignment="Left">
             <Label x:Name="LblEnter" Content="Enter your name:" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="5,25,0,0" FontSize="14"/>
