@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
-using System.Threading.Tasks;
 using System.Net;
 using System.Net.Sockets;
 using System.Windows;
@@ -55,12 +54,6 @@ namespace Chat
             {
                 IPAddress BroadcastIP = IPAddress.Parse(userIP.ToString().Substring(0, userIP.ToString().LastIndexOf('.') + 1) + "255");
 
-                //Task listenUdpTask = new Task(ListenToUDP);
-                //listenUdpTask.Start();
-
-                //Task listenTcpTask = new Task(ListenToTCP);
-                //listenTcpTask.Start();
-
                 Thread listenUdp = new Thread(() => ListenToUDP());
                 listenUdp.Start();
 
@@ -86,7 +79,7 @@ namespace Chat
             {
                 udpSender.Send(messageBytes, messageBytes.Length, destinationEP);
 
-                display($"You, {userName} [{userIP}], ({DateTime.Now}) joined the chat.\n");
+                display($"You [{userIP}] ({DateTime.Now}) joined the chat.\n");
                 history.Append($"{userName} [{userIP}] ({DateTime.Now}) joined the chat.\n");
             }
             catch
@@ -114,7 +107,6 @@ namespace Chat
 
                 User newUser = new User(userName, remoteEP.Address, TCP_PORT);
 
-
                 if (Users.Find(x => x.userIP.ToString() == remoteEP.Address.ToString()) == null && userIP.ToString() != remoteEP.Address.ToString())
                 {
                     newUser.Connect();
@@ -122,8 +114,10 @@ namespace Chat
                     Message tcpMessage = new Message(NAME_TRANSMISSION, this.userName);
                     newUser.SendMessage(tcpMessage);
 
-                    Users.Add(newUser);
-                    //Task.Factory.StartNew(() => ListenUser(newUser));
+                    lock (Connection._locker)
+                    {
+                        Users.Add(newUser);
+                    }
                     Thread thread = new Thread(() => ListenUser(newUser));
                     thread.Start();
 
@@ -154,10 +148,12 @@ namespace Chat
 
                     if (Users.Find(x => x.userIP.ToString() == newUser.userIP.ToString()) == null && userIP.ToString() != newUser.userIP.ToString())
                     {
-                        Users.Add(newUser);
+                        lock (Connection._locker)
+                        {
+                            Users.Add(newUser);
+                        }
                         Thread thread = new Thread(() => ListenUser(newUser));
                         thread.Start();
-                        //Task.Factory.StartNew(() => ListenUser(newUser));
                     }
                 }
             }
@@ -234,7 +230,6 @@ namespace Chat
                             {
                                 clearScreen();
                                 HistoryPreparing(display, tcpMessage.Text);
-                                //display(tcpMessage.Text);
                                 history.Remove(0, history.Length);
                                 history.Append(tcpMessage.Text);
                             }, null);
@@ -289,7 +284,7 @@ namespace Chat
         {
             int HistoryCount = 0, AllLength = Text.Length;
             string MyHistory = "", History = Text;
-            string Message = "";
+            string Message;
             while (History != "")
             {
                 Message = History.Substring(0, History.IndexOf('\n') + 1);
