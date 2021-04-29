@@ -69,7 +69,8 @@ namespace Chat
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
-            userConnection.Disconnect();
+            if (userConnection != null)
+                userConnection.Disconnect();
             System.Environment.Exit(0);
         }
     }

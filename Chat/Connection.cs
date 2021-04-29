@@ -5,6 +5,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Windows;
 using System.Threading;
+using System.Net.NetworkInformation;
 
 namespace Chat
 {
@@ -52,7 +53,7 @@ namespace Chat
         {
             try
             {
-                IPAddress BroadcastIP = IPAddress.Parse(userIP.ToString().Substring(0, userIP.ToString().LastIndexOf('.') + 1) + "255");
+                IPAddress BroadcastIP = getBroadcast(userIP);
 
                 Thread listenUdp = new Thread(() => ListenToUDP());
                 listenUdp.Start();
@@ -66,6 +67,34 @@ namespace Chat
             {
                 Disconnect();
             }
+        }
+        private IPAddress getBroadcast(IPAddress userIP)
+        {
+            IPAddress Mask = null;
+
+            NetworkInterface[] allNets = NetworkInterface.GetAllNetworkInterfaces();
+            foreach (NetworkInterface adapter in allNets)
+            {
+                foreach (UnicastIPAddressInformation unicastIPAddressInformation in adapter.GetIPProperties().UnicastAddresses)
+                {
+                    if (unicastIPAddressInformation.Address.AddressFamily == AddressFamily.InterNetwork)
+                    {
+                        if (userIP.Equals(unicastIPAddressInformation.Address))
+                        {
+                            Mask = unicastIPAddressInformation.IPv4Mask;
+                        }
+                    }
+                }
+            }
+            byte[] byteMask = Mask.GetAddressBytes();
+            byte[] userMask = userIP.GetAddressBytes();
+            for (int i = 0; i < 4; i++)
+            {
+                byteMask[i] = (byte)((byte)~byteMask[i] | userMask[i]);
+            }
+            Mask = new IPAddress(byteMask);
+
+            return Mask;
         }
         public void SendBroadcastPackage(IPAddress BroadcastIP)
         {
@@ -111,7 +140,7 @@ namespace Chat
                 {
                     newUser.Connect();
 
-                    Message tcpMessage = new Message(NAME_TRANSMISSION, this.userName);
+                    Message tcpMessage = new Message(NAME_TRANSMISSION, (byte)this.userName.Length, this.userName);
                     newUser.SendMessage(tcpMessage);
 
                     lock (Connection._locker)
@@ -139,9 +168,10 @@ namespace Chat
             tcpListener.Start();
 
             ShouldTCPListen = true;
-            while (ShouldTCPListen)
+            //while (ShouldTCPListen)
+            do
             {
-                if (tcpListener.Pending())
+                //if (tcpListener.Pending())
                 {
                     TcpClient tcpClient = tcpListener.AcceptTcpClient();
                     User newUser = new User(tcpClient, TCP_PORT);
@@ -156,7 +186,7 @@ namespace Chat
                         thread.Start();
                     }
                 }
-            }
+            } while (ShouldTCPListen && tcpListener.Pending());
 
             tcpListener.Stop();
         }
@@ -169,7 +199,7 @@ namespace Chat
             string message = $"{userName} [{userIP}] ({DateTime.Now}) disconnected.\n";
             display(message);
             history.Append(message);
-            Message tcpMessage = new Message(USER_DISCONNECT, message);
+            Message tcpMessage = new Message(USER_DISCONNECT, (byte)message.Length, message);
 
             foreach (User user in Users)
             {
@@ -194,8 +224,9 @@ namespace Chat
         {
             while (user.IsOnline)
             {
-                if (user.Stream.DataAvailable)
+                try
                 {
+                    //if (user.Stream.DataAvailable)
                     byte[] message = user.ReceiveMessage();
                     Message tcpMessage = new Message(message);
 
@@ -250,19 +281,36 @@ namespace Chat
                             break;
                     }
                 }
+                catch (System.IO.IOException)
+                {
+                    string messageDisc = $"{user.userName} [{user.userIP}] ({DateTime.Now}) disconnected.\n";
+                    user.Close();
+                    Users.Remove(user);
+                    synchronizationContext.Post(delegate
+                    {
+                        history.Append(messageDisc);
+                        display(messageDisc);
+                    }, null);
+
+                    break;
+                }
+                catch
+                {
+                    continue;
+                }
             }
         }
         private void GetHistory(int code, User user)
         {
             string message = (code == SEND_HISTORY) ? string.Empty : history.ToString();
-            Message tcpHistoryMessage = new Message(code, message);
+            Message tcpHistoryMessage = new Message((byte)code, message.Length, message);
 
             user.SendMessage(tcpHistoryMessage);
         }
         public void SendMessage()
         {
             string message = get();
-            Message tcpMessage = new Message(MESSAGE, message);
+            Message tcpMessage = new Message(MESSAGE, message.Length, message);
 
             foreach (User user in Users)
             {

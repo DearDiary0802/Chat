@@ -1,6 +1,7 @@
 ﻿using System.Text;
 using System.Net;
 using System.Net.Sockets;
+using System;
 
 namespace Chat
 {
@@ -12,6 +13,7 @@ namespace Chat
         private TcpClient ChatUser;
         public NetworkStream Stream;
         public bool IsOnline = true;
+        private readonly int READ_BUFFER = 4096;
 
         public User(TcpClient chatUser, int port)
         {
@@ -36,21 +38,27 @@ namespace Chat
         }
         public void SendMessage(Message TCPMessage)
         {
-            byte[] message = Encoding.UTF8.GetBytes(TCPMessage.Code + TCPMessage.Text);
+            byte[] text = Encoding.UTF8.GetBytes(TCPMessage.Text);
+            byte[] message = new byte[5 + text.Length];
+            message[0] = TCPMessage.Code;
+            Array.Copy(BitConverter.GetBytes(TCPMessage.Size), 0, message, 1, 4);
+            Array.Copy(text, 0, message, 5, text.Length);
             Stream.Write(message, 0, message.Length);
         }
         public byte[] ReceiveMessage()
         {
-            StringBuilder message = new StringBuilder();
-            byte[] buffer = new byte[256];
+            int size = 0, readSize = 0;
+            byte[] buffer = new byte[READ_BUFFER];
+            byte[] readData = new byte[READ_BUFFER];
             do
             {
-                int size = Stream.Read(buffer, 0, buffer.Length);
-                message.Append(Encoding.UTF8.GetString(buffer, 0, size));
+                size = Stream.Read(readData, readSize, READ_BUFFER - readSize);
+                Array.Copy(readData, 0, buffer, readSize, size);
+                readSize += size;
             }
-            while (Stream.DataAvailable);
+            while (Stream.DataAvailable && size > 0);
 
-            return Encoding.UTF8.GetBytes(message.ToString());
+            return buffer;
         }
         public void Close()
         {
